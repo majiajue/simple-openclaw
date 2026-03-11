@@ -46,6 +46,11 @@ simple_openclaw_secret() {
       require_arg "$value" "secret value"
       set_secret_value "$key" "$value"
       sync_openclaw_env_secret "$key" "$value"
+      if [[ "$key" == "model.api_key" ]]; then
+        # shellcheck source=/dev/null
+        source "$ROOT_DIR/lib/model.sh"
+        sync_openclaw_model_config
+      fi
       info "secret updated: $key"
       ;;
     list)

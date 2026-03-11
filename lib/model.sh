@@ -5,10 +5,11 @@ sync_openclaw_model_config() {
   [[ -f "$openclaw_config" ]] || return 0
   require_jq
 
-  local base_url model_name provider
+  local base_url model_name provider api_key
   base_url="$(env_get OPENCLAW_MODEL_BASE_URL || true)"
   model_name="$(env_get OPENCLAW_MODEL_NAME || true)"
   provider="$(env_get OPENCLAW_MODEL_PROVIDER || printf 'openai-compatible')"
+  api_key="$(json_get "$SECRETS_FILE" '.["model.api_key"] // empty' 2>/dev/null || true)"
 
   [[ -n "$model_name" ]] || return 0
 
@@ -20,20 +21,47 @@ sync_openclaw_model_config() {
   esac
 
   local model_ref="${provider_prefix}/${model_name}"
-
   local tmp="${openclaw_config}.tmp"
-  if [[ "$provider_prefix" == "custom" ]] && [[ -n "$base_url" ]]; then
-    jq --arg model "$model_ref" --arg alias "$model_name" \
-       --arg provider "$provider_prefix" --arg baseUrl "$base_url" \
-       '.agents.defaults.model.primary = $model
-       | .agents.defaults.models[$model] = { alias: $alias }
-       | .models.providers[$provider] = { baseUrl: $baseUrl }' \
-       "$openclaw_config" >"$tmp"
+
+  local env_key
+  case "$provider_prefix" in
+    anthropic) env_key="ANTHROPIC_API_KEY" ;;
+    openai)    env_key="OPENAI_API_KEY" ;;
+    *)         env_key="OPENAI_API_KEY" ;;
+  esac
+
+  if [[ -n "$base_url" ]]; then
+    if [[ -n "$api_key" ]]; then
+      jq --arg model "$model_ref" --arg alias "$model_name" \
+         --arg provider "$provider_prefix" --arg baseUrl "$base_url" \
+         --arg envKey "$env_key" --arg apiKey "$api_key" \
+         '.agents.defaults.model.primary = $model
+         | .agents.defaults.models[$model] = { alias: $alias }
+         | .models.providers[$provider] = { baseUrl: $baseUrl }
+         | .env[$envKey] = $apiKey' \
+         "$openclaw_config" >"$tmp"
+    else
+      jq --arg model "$model_ref" --arg alias "$model_name" \
+         --arg provider "$provider_prefix" --arg baseUrl "$base_url" \
+         '.agents.defaults.model.primary = $model
+         | .agents.defaults.models[$model] = { alias: $alias }
+         | .models.providers[$provider] = { baseUrl: $baseUrl }' \
+         "$openclaw_config" >"$tmp"
+    fi
   else
-    jq --arg model "$model_ref" --arg alias "$model_name" \
-       '.agents.defaults.model.primary = $model
-       | .agents.defaults.models[$model] = { alias: $alias }' \
-       "$openclaw_config" >"$tmp"
+    if [[ -n "$api_key" ]]; then
+      jq --arg model "$model_ref" --arg alias "$model_name" \
+         --arg envKey "$env_key" --arg apiKey "$api_key" \
+         '.agents.defaults.model.primary = $model
+         | .agents.defaults.models[$model] = { alias: $alias }
+         | .env[$envKey] = $apiKey' \
+         "$openclaw_config" >"$tmp"
+    else
+      jq --arg model "$model_ref" --arg alias "$model_name" \
+         '.agents.defaults.model.primary = $model
+         | .agents.defaults.models[$model] = { alias: $alias }' \
+         "$openclaw_config" >"$tmp"
+    fi
   fi
   mv "$tmp" "$openclaw_config"
 }

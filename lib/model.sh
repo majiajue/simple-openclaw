@@ -37,7 +37,8 @@ sync_openclaw_model_config() {
          --arg envKey "$env_key" --arg apiKey "$api_key" \
          '.agents.defaults.model.primary = $model
          | .agents.defaults.models[$model] = { alias: $alias }
-         | .models.providers[$provider] = { baseUrl: $baseUrl }
+         | .models.providers[$provider].baseUrl = $baseUrl
+         | .models.providers[$provider].models = (.models.providers[$provider].models // [{ id: $model }])
          | .env[$envKey] = $apiKey' \
          "$openclaw_config" >"$tmp"
     else
@@ -45,7 +46,8 @@ sync_openclaw_model_config() {
          --arg provider "$provider_prefix" --arg baseUrl "$base_url" \
          '.agents.defaults.model.primary = $model
          | .agents.defaults.models[$model] = { alias: $alias }
-         | .models.providers[$provider] = { baseUrl: $baseUrl }' \
+         | .models.providers[$provider].baseUrl = $baseUrl
+         | .models.providers[$provider].models = (.models.providers[$provider].models // [{ id: $model }])' \
          "$openclaw_config" >"$tmp"
     fi
   else

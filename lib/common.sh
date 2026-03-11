@@ -198,6 +198,22 @@ auto_install_node() {
   info "Node.js ${installed} installed successfully"
 }
 
+find_working_node() {
+  local candidate
+  for candidate in /usr/local/bin/node /usr/bin/node; do
+    if [[ -x "$candidate" ]] && "$candidate" -v >/dev/null 2>&1; then
+      printf '%s' "$candidate"
+      return 0
+    fi
+  done
+  candidate="$(command -v node 2>/dev/null || true)"
+  if [[ -n "$candidate" ]] && "$candidate" -v >/dev/null 2>&1; then
+    printf '%s' "$candidate"
+    return 0
+  fi
+  printf ''
+}
+
 detect_system_package_manager() {
   if command_exists apt-get; then
     printf 'apt'

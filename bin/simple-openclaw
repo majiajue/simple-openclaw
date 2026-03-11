@@ -135,16 +135,20 @@ main() {
       dispatch_module bundle "$@"
       ;;
     chat|tui)
-      local oc
+      local oc node_bin
       oc="$(openclaw_bin)"
       [[ -n "$oc" ]] || die "openclaw binary not found; run simple-openclaw install first"
-      exec "$oc" tui "$@"
+      node_bin="$(find_working_node)"
+      [[ -n "$node_bin" ]] || die "no working node binary found; run simple-openclaw install first"
+      exec "$node_bin" "$oc" tui "$@"
       ;;
     agent)
-      local oc
+      local oc node_bin
       oc="$(openclaw_bin)"
       [[ -n "$oc" ]] || die "openclaw binary not found; run simple-openclaw install first"
-      exec "$oc" agent "$@"
+      node_bin="$(find_working_node)"
+      [[ -n "$node_bin" ]] || die "no working node binary found; run simple-openclaw install first"
+      exec "$node_bin" "$oc" agent "$@"
       ;;
     *)
       die "unknown command: $command"

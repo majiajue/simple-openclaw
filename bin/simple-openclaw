@@ -18,6 +18,11 @@ Core:
   start | stop | restart | status | probe
   health | doctor
 
+Chat:
+  chat                    open TUI chat (alias for tui)
+  tui                     open terminal chat UI
+  agent --message <text>  send a single message and get reply
+
 Domains:
   model <set|list|test>
   channel <list|add|edit|remove|test>
@@ -35,11 +40,13 @@ Domains:
   support-bundle
 
 Examples:
-  simple-openclaw install
-  simple-openclaw model set --base-url https://api.openai.com/v1 --model gpt-4.1
-  simple-openclaw channel add feishu
-  simple-openclaw plugin audit
-  simple-openclaw doctor --fix
+  simple-openclaw install --channel stable
+  simple-openclaw init
+  simple-openclaw model set --base-url https://api.anthropic.com/v1 --model claude-sonnet-4-20250514 --provider anthropic
+  simple-openclaw secret set model.api_key your-key
+  simple-openclaw start
+  simple-openclaw chat
+  simple-openclaw agent --message "hello"
 EOF
 }
 
@@ -126,6 +133,18 @@ main() {
       ;;
     support-bundle)
       dispatch_module bundle "$@"
+      ;;
+    chat|tui)
+      local oc
+      oc="$(openclaw_bin)"
+      [[ -n "$oc" ]] || die "openclaw binary not found; run simple-openclaw install first"
+      exec "$oc" tui "$@"
+      ;;
+    agent)
+      local oc
+      oc="$(openclaw_bin)"
+      [[ -n "$oc" ]] || die "openclaw binary not found; run simple-openclaw install first"
+      exec "$oc" agent "$@"
       ;;
     *)
       die "unknown command: $command"

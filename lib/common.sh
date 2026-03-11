@@ -189,6 +189,12 @@ auto_install_node() {
     diag="$("${install_prefix}/bin/node" -v 2>&1 || true)"
     die "Node.js auto-install failed; binary is not functional after extraction: $diag"
   fi
+
+  if [[ -e "/usr/bin/node" ]] && ! /usr/bin/node -v >/dev/null 2>&1; then
+    ln -sf "${install_prefix}/bin/node" /usr/bin/node
+    info "replaced broken /usr/bin/node with symlink to ${install_prefix}/bin/node"
+  fi
+
   info "Node.js ${installed} installed successfully"
 }
 

@@ -1,5 +1,43 @@
 #!/usr/bin/env bash
 
+sync_openclaw_model_config() {
+  local openclaw_config="${HOME}/.openclaw/openclaw.json"
+  [[ -f "$openclaw_config" ]] || return 0
+  require_jq
+
+  local base_url model_name provider
+  base_url="$(env_get OPENCLAW_MODEL_BASE_URL || true)"
+  model_name="$(env_get OPENCLAW_MODEL_NAME || true)"
+  provider="$(env_get OPENCLAW_MODEL_PROVIDER || printf 'openai-compatible')"
+
+  [[ -n "$model_name" ]] || return 0
+
+  local provider_prefix
+  case "$provider" in
+    anthropic) provider_prefix="anthropic" ;;
+    openai)    provider_prefix="openai" ;;
+    *)         provider_prefix="custom" ;;
+  esac
+
+  local model_ref="${provider_prefix}/${model_name}"
+
+  local tmp="${openclaw_config}.tmp"
+  if [[ "$provider_prefix" == "custom" ]] && [[ -n "$base_url" ]]; then
+    jq --arg model "$model_ref" --arg alias "$model_name" \
+       --arg provider "$provider_prefix" --arg baseUrl "$base_url" \
+       '.agents.defaults.model.primary = $model
+       | .agents.defaults.models[$model] = { alias: $alias }
+       | .models.providers[$provider] = { baseUrl: $baseUrl }' \
+       "$openclaw_config" >"$tmp"
+  else
+    jq --arg model "$model_ref" --arg alias "$model_name" \
+       '.agents.defaults.model.primary = $model
+       | .agents.defaults.models[$model] = { alias: $alias }' \
+       "$openclaw_config" >"$tmp"
+  fi
+  mv "$tmp" "$openclaw_config"
+}
+
 simple_openclaw_model() {
   local action="${1:-list}"
   shift || true
@@ -29,6 +67,7 @@ simple_openclaw_model() {
             ;;
         esac
       done
+      sync_openclaw_model_config
       info "model configuration updated"
       ;;
     list)

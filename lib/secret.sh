@@ -6,6 +6,34 @@ set_secret_value() {
   json_set_inplace "$SECRETS_FILE" --arg key "$key" --arg value "$value" '.[$key] = $value'
 }
 
+sync_openclaw_env_secret() {
+  local key="$1"
+  local value="$2"
+  local openclaw_env="${HOME}/.openclaw/.env"
+
+  if [[ "$key" == "model.api_key" ]]; then
+    local provider
+    provider="$(env_get OPENCLAW_MODEL_PROVIDER || printf 'openai-compatible')"
+
+    mkdir -p "${HOME}/.openclaw"
+
+    local env_key
+    case "$provider" in
+      anthropic) env_key="ANTHROPIC_API_KEY" ;;
+      openai)    env_key="OPENAI_API_KEY" ;;
+      *)         env_key="OPENAI_API_KEY" ;;
+    esac
+
+    if [[ -f "$openclaw_env" ]] && grep -q "^${env_key}=" "$openclaw_env"; then
+      sed -i.bak "s|^${env_key}=.*|${env_key}=${value}|" "$openclaw_env"
+      rm -f "${openclaw_env}.bak"
+    else
+      printf '%s=%s\n' "$env_key" "$value" >>"$openclaw_env"
+    fi
+    chmod 600 "$openclaw_env"
+  fi
+}
+
 simple_openclaw_secret() {
   local action="${1:-list}"
   shift || true
@@ -17,6 +45,7 @@ simple_openclaw_secret() {
       require_arg "$key" "secret key"
       require_arg "$value" "secret value"
       set_secret_value "$key" "$value"
+      sync_openclaw_env_secret "$key" "$value"
       info "secret updated: $key"
       ;;
     list)

@@ -41,18 +41,29 @@ simple_openclaw_install() {
       info "initializing runtime directories under $SIMPLE_OPENCLAW_HOME"
       ensure_runtime_dirs
       info "detected operating system: $os"
+      local need_node=0
       if command_exists node; then
         local node_ver
         node_ver="$(node_version)"
         if [[ -z "$node_ver" ]]; then
-          die "Node.js binary found but is not functional (run 'node -v' to diagnose); install a working Node.js 22+ before deploying OpenClaw"
-        fi
-        info "detected Node.js v${node_ver}"
-        if [[ "$node_major" -lt 22 ]]; then
-          die "Node.js 22+ is required, found v${node_ver}"
+          warn "Node.js binary found but is not functional; will auto-install"
+          need_node=1
+        elif [[ "$node_major" -lt 22 ]]; then
+          warn "Node.js 22+ is required, found v${node_ver}; will auto-install"
+          need_node=1
+        else
+          info "detected Node.js v${node_ver}"
         fi
       else
-        die "Node.js is not installed; install Node.js 22+ before deploying OpenClaw"
+        warn "Node.js is not installed; will auto-install"
+        need_node=1
+      fi
+
+      if [[ "$need_node" -eq 1 ]]; then
+        info "auto-installing Node.js 22..."
+        auto_install_node 22
+        node_major="$(node_major_version)"
+        pm="$(package_manager)"
       fi
       ensure_supported_package_manager "$pm"
       info "detected package manager: $pm"

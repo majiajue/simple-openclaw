@@ -71,6 +71,76 @@ detect_service_manager() {
   fi
 }
 
+auto_install_node() {
+  local target_major="${1:-22}"
+  local os arch node_ver tarball url tmp_dir
+
+  os="$(uname -s)"
+  arch="$(uname -m)"
+
+  case "$arch" in
+    x86_64)  arch="x64"   ;;
+    aarch64|arm64) arch="arm64" ;;
+    armv7l)  arch="armv7l" ;;
+    *)       die "unsupported architecture for auto-install: $arch" ;;
+  esac
+
+  case "$os" in
+    Linux)  os="linux"  ;;
+    Darwin) os="darwin" ;;
+    *)      die "unsupported OS for auto-install: $os" ;;
+  esac
+
+  info "resolving latest Node.js ${target_major}.x version..."
+  if command_exists curl; then
+    node_ver="$(curl -fsSL "https://resolve-node.now.sh/${target_major}" 2>/dev/null || true)"
+  elif command_exists wget; then
+    node_ver="$(wget -qO- "https://resolve-node.now.sh/${target_major}" 2>/dev/null || true)"
+  fi
+
+  if [[ -z "$node_ver" ]]; then
+    node_ver="v${target_major}.0.0"
+    warn "could not resolve latest version, falling back to $node_ver"
+  fi
+
+  tarball="node-${node_ver}-${os}-${arch}.tar.xz"
+  url="https://nodejs.org/dist/${node_ver}/${tarball}"
+  tmp_dir="$(mktemp -d)"
+
+  info "downloading Node.js ${node_ver} for ${os}-${arch}..."
+  if command_exists curl; then
+    curl -fsSL "$url" -o "${tmp_dir}/${tarball}" || die "failed to download Node.js from $url"
+  elif command_exists wget; then
+    wget -q "$url" -O "${tmp_dir}/${tarball}" || die "failed to download Node.js from $url"
+  else
+    die "curl or wget is required to auto-install Node.js"
+  fi
+
+  local install_prefix="/usr/local"
+  info "extracting Node.js to ${install_prefix}..."
+  tar -xJf "${tmp_dir}/${tarball}" -C "$tmp_dir"
+  local extracted_dir="${tmp_dir}/node-${node_ver}-${os}-${arch}"
+
+  cp -f "${extracted_dir}/bin/node" "${install_prefix}/bin/node"
+  cp -rf "${extracted_dir}/lib/node_modules" "${install_prefix}/lib/node_modules"
+  ln -sf "${install_prefix}/lib/node_modules/npm/bin/npm-cli.js" "${install_prefix}/bin/npm"
+  ln -sf "${install_prefix}/lib/node_modules/npm/bin/npx-cli.js" "${install_prefix}/bin/npx"
+  if [[ -d "${extracted_dir}/lib/node_modules/corepack" ]]; then
+    ln -sf "${install_prefix}/lib/node_modules/corepack/dist/corepack.js" "${install_prefix}/bin/corepack" 2>/dev/null || true
+  fi
+  chmod +x "${install_prefix}/bin/node"
+  rm -rf "$tmp_dir"
+
+  export PATH="${install_prefix}/bin:$PATH"
+
+  local installed
+  installed="$(node_version)"
+  if [[ -z "$installed" ]]; then
+    die "Node.js auto-install failed; binary is not functional after extraction"
+  fi
+  info "Node.js v${installed} installed successfully"
+}
+
 node_version() {
   if command_exists node; then
     local raw

@@ -71,11 +71,26 @@ simple_openclaw_install() {
       info "detected ${pm} $($pm -v)"
       ensure_build_tools
       install_cmd="$(npm_global_install_cmd "$pm" "${pkg}@${version_or_tag}")"
-      info "installing ${pkg}@${version_or_tag} via ${pm}"
+      info "installing ${pkg}@${version_or_tag} via ${pm} (skipping postinstall scripts)..."
       if [[ "$dry_run" == "1" ]]; then
-        run_cmd --dry-run bash -lc "$install_cmd"
+        run_cmd --dry-run bash -lc "$install_cmd --ignore-scripts"
       else
-        run_cmd bash -lc "$install_cmd"
+        run_cmd bash -lc "$install_cmd --ignore-scripts"
+      fi
+
+      local pkg_dir=""
+      if [[ "$pm" == "npm" ]]; then
+        pkg_dir="$(npm root -g 2>/dev/null)/${pkg}" || true
+      elif [[ "$pm" == "pnpm" ]]; then
+        pkg_dir="$(pnpm root -g 2>/dev/null)/${pkg}" || true
+      fi
+
+      if [[ -n "$pkg_dir" ]] && [[ -d "$pkg_dir" ]] && [[ "$dry_run" != "1" ]]; then
+        info "running postinstall scripts (native modules may take a while)..."
+        if ! (cd "$pkg_dir" && npm rebuild 2>&1 | tail -n 5); then
+          warn "some native modules failed to build; OpenClaw will still work with remote API providers"
+          warn "to retry later: cd $pkg_dir && npm rebuild"
+        fi
       fi
       openclaw_path="$(openclaw_bin)"
       if [[ -n "$openclaw_path" ]]; then

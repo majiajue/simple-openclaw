@@ -190,18 +190,61 @@ auto_install_node() {
 detect_system_package_manager() {
   if command_exists apt-get; then
     printf 'apt'
-  elif command_exists yum; then
-    printf 'yum'
   elif command_exists dnf; then
     printf 'dnf'
+  elif command_exists yum; then
+    printf 'yum'
   elif command_exists apk; then
     printf 'apk'
   elif command_exists pacman; then
     printf 'pacman'
   elif command_exists zypper; then
     printf 'zypper'
+  elif command_exists brew; then
+    printf 'brew'
   else
     printf ''
+  fi
+}
+
+detect_distro() {
+  local os
+  os="$(uname -s)"
+  if [[ "$os" == "Darwin" ]]; then
+    printf 'macos'
+    return
+  fi
+  if [[ -f /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    case "${ID:-}" in
+      ubuntu|debian|linuxmint|pop|elementary|kali|raspbian)
+        printf 'debian'
+        ;;
+      centos|rhel|rocky|almalinux|ol|amzn|fedora)
+        printf 'rhel'
+        ;;
+      alpine)
+        printf 'alpine'
+        ;;
+      arch|manjaro|endeavouros)
+        printf 'arch'
+        ;;
+      opensuse*|sles)
+        printf 'suse'
+        ;;
+      *)
+        printf 'unknown'
+        ;;
+    esac
+  elif [[ -f /etc/redhat-release ]]; then
+    printf 'rhel'
+  elif [[ -f /etc/debian_version ]]; then
+    printf 'debian'
+  elif [[ -f /etc/alpine-release ]]; then
+    printf 'alpine'
+  else
+    printf 'unknown'
   fi
 }
 
@@ -227,24 +270,68 @@ cmake_needs_upgrade() {
   return 1
 }
 
-install_cmake_from_source() {
+install_cmake_binary() {
   local cmake_ver="3.28.6"
-  local tmp_dir url
+  local os arch platform tmp_dir url
+  os="$(uname -s)"
+  arch="$(uname -m)"
   tmp_dir="$(mktemp -d)"
-  url="https://github.com/Kitware/CMake/releases/download/v${cmake_ver}/cmake-${cmake_ver}-linux-x86_64.tar.gz"
 
-  info "downloading CMake ${cmake_ver} binary..."
+  case "$os" in
+    Linux)
+      case "$arch" in
+        x86_64)  platform="linux-x86_64" ;;
+        aarch64) platform="linux-aarch64" ;;
+        *)
+          rm -rf "$tmp_dir"
+          return 1
+          ;;
+      esac
+      url="https://github.com/Kitware/CMake/releases/download/v${cmake_ver}/cmake-${cmake_ver}-${platform}.tar.gz"
+      ;;
+    Darwin)
+      platform="macos-universal"
+      url="https://github.com/Kitware/CMake/releases/download/v${cmake_ver}/cmake-${cmake_ver}-${platform}.tar.gz"
+      ;;
+    *)
+      rm -rf "$tmp_dir"
+      return 1
+      ;;
+  esac
+
+  info "downloading CMake ${cmake_ver} for ${platform}..."
   if command_exists curl; then
-    curl -fsSL "$url" -o "${tmp_dir}/cmake.tar.gz" || die "failed to download CMake"
+    curl -fsSL "$url" -o "${tmp_dir}/cmake.tar.gz" || { rm -rf "$tmp_dir"; return 1; }
   elif command_exists wget; then
-    wget -q "$url" -O "${tmp_dir}/cmake.tar.gz" || die "failed to download CMake"
+    wget -q "$url" -O "${tmp_dir}/cmake.tar.gz" || { rm -rf "$tmp_dir"; return 1; }
+  else
+    rm -rf "$tmp_dir"
+    return 1
   fi
 
   tar -xzf "${tmp_dir}/cmake.tar.gz" -C "$tmp_dir"
-  cp -f "${tmp_dir}/cmake-${cmake_ver}-linux-x86_64/bin/cmake" /usr/local/bin/cmake
-  cp -f "${tmp_dir}/cmake-${cmake_ver}-linux-x86_64/bin/ctest" /usr/local/bin/ctest
-  cp -f "${tmp_dir}/cmake-${cmake_ver}-linux-x86_64/bin/cpack" /usr/local/bin/cpack
-  cp -rf "${tmp_dir}/cmake-${cmake_ver}-linux-x86_64/share/cmake-3.28" /usr/local/share/cmake-3.28
+  local cmake_dir="${tmp_dir}/cmake-${cmake_ver}-${platform}"
+
+  if [[ "$os" == "Darwin" ]]; then
+    local app_dir="${cmake_dir}/CMake.app/Contents"
+    if [[ -d "$app_dir" ]]; then
+      cp -f "${app_dir}/bin/cmake" /usr/local/bin/cmake
+      cp -f "${app_dir}/bin/ctest" /usr/local/bin/ctest
+      cp -f "${app_dir}/bin/cpack" /usr/local/bin/cpack
+    else
+      cp -f "${cmake_dir}/bin/cmake" /usr/local/bin/cmake
+      cp -f "${cmake_dir}/bin/ctest" /usr/local/bin/ctest
+      cp -f "${cmake_dir}/bin/cpack" /usr/local/bin/cpack
+    fi
+  else
+    cp -f "${cmake_dir}/bin/cmake" /usr/local/bin/cmake
+    cp -f "${cmake_dir}/bin/ctest" /usr/local/bin/ctest
+    cp -f "${cmake_dir}/bin/cpack" /usr/local/bin/cpack
+    if ls -d "${cmake_dir}"/share/cmake-* >/dev/null 2>&1; then
+      cp -rf "${cmake_dir}"/share/cmake-* /usr/local/share/ 2>/dev/null || true
+    fi
+  fi
+
   chmod +x /usr/local/bin/cmake /usr/local/bin/ctest /usr/local/bin/cpack
   rm -rf "$tmp_dir"
   hash -r 2>/dev/null || true
@@ -252,68 +339,165 @@ install_cmake_from_source() {
   info "CMake $(cmake --version 2>/dev/null | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+') installed"
 }
 
-ensure_build_tools() {
-  local os sys_pm missing_pkgs=""
-  os="$(detect_os)"
-  sys_pm="$(detect_system_package_manager)"
+ensure_build_tools_debian() {
+  local sys_pm="apt"
+  local missing_pkgs=""
 
-  if [[ "$os" != "Linux" ]]; then
-    return 0
-  fi
+  if ! command_exists git; then missing_pkgs="$missing_pkgs git"; fi
+  if ! command_exists make; then missing_pkgs="$missing_pkgs build-essential"; fi
+  if ! command_exists g++ && ! command_exists c++; then missing_pkgs="$missing_pkgs build-essential"; fi
+  if ! command_exists python3 && ! command_exists python; then missing_pkgs="$missing_pkgs python3"; fi
 
-  info "checking build prerequisites..."
-
-  if ! command_exists git; then
-    missing_pkgs="$missing_pkgs git"
-  fi
-  if ! command_exists make; then
-    missing_pkgs="$missing_pkgs make"
-  fi
-  if ! command_exists g++ && ! command_exists c++; then
-    missing_pkgs="$missing_pkgs g++"
-  fi
-  if ! command_exists python3 && ! command_exists python; then
-    missing_pkgs="$missing_pkgs python3"
-  fi
+  missing_pkgs="$(printf '%s' "$missing_pkgs" | tr ' ' '\n' | sort -u | tr '\n' ' ' | sed 's/^ *//;s/ *$//')"
 
   if [[ -n "$missing_pkgs" ]]; then
-    if [[ -z "$sys_pm" ]]; then
-      die "missing build tools ($missing_pkgs) and no system package manager found; install them manually"
-    fi
-    info "installing build tools:$missing_pkgs"
-    case "$sys_pm" in
-      apt)
-        apt-get update -qq >/dev/null 2>&1 || true
-        # shellcheck disable=SC2086
-        apt-get install -y -qq $missing_pkgs >/dev/null 2>&1 || die "failed to install$missing_pkgs via apt"
-        ;;
-      yum)
-        # shellcheck disable=SC2086
-        yum install -y -q $missing_pkgs >/dev/null 2>&1 || die "failed to install$missing_pkgs via yum"
-        ;;
-      dnf)
-        # shellcheck disable=SC2086
-        dnf install -y -q $missing_pkgs >/dev/null 2>&1 || die "failed to install$missing_pkgs via dnf"
-        ;;
-      apk)
-        local apk_pkgs
-        apk_pkgs="$(printf '%s' "$missing_pkgs" | sed 's/g++/g++ build-base/')"
-        # shellcheck disable=SC2086
-        apk add --quiet $apk_pkgs >/dev/null 2>&1 || die "failed to install$missing_pkgs via apk"
-        ;;
-      pacman)
-        # shellcheck disable=SC2086
-        pacman -S --noconfirm --needed $missing_pkgs >/dev/null 2>&1 || die "failed to install$missing_pkgs via pacman"
-        ;;
-      zypper)
-        # shellcheck disable=SC2086
-        zypper install -y $missing_pkgs >/dev/null 2>&1 || die "failed to install$missing_pkgs via zypper"
-        ;;
-    esac
+    info "installing build tools via apt: $missing_pkgs"
+    apt-get update -qq >/dev/null 2>&1 || true
+    # shellcheck disable=SC2086
+    apt-get install -y -qq $missing_pkgs >/dev/null 2>&1 || die "failed to install $missing_pkgs via apt"
     info "build tools installed"
   fi
+}
 
-  if cmake_needs_upgrade; then
+ensure_build_tools_rhel() {
+  local sys_pm="$1"
+  local missing_pkgs=""
+
+  if ! command_exists git; then missing_pkgs="$missing_pkgs git"; fi
+  if ! command_exists make; then missing_pkgs="$missing_pkgs make"; fi
+  if ! command_exists g++ && ! command_exists c++; then missing_pkgs="$missing_pkgs gcc-c++"; fi
+  if ! command_exists python3 && ! command_exists python; then missing_pkgs="$missing_pkgs python3"; fi
+
+  if [[ -n "$missing_pkgs" ]]; then
+    info "installing build tools via $sys_pm:$missing_pkgs"
+    # shellcheck disable=SC2086
+    "$sys_pm" install -y -q $missing_pkgs >/dev/null 2>&1 || {
+      info "trying Development Tools group..."
+      "$sys_pm" groupinstall -y -q "Development Tools" >/dev/null 2>&1 || true
+    }
+    info "build tools installed"
+  fi
+}
+
+ensure_build_tools_alpine() {
+  local missing_pkgs=""
+
+  if ! command_exists git; then missing_pkgs="$missing_pkgs git"; fi
+  if ! command_exists make || ! command_exists g++; then missing_pkgs="$missing_pkgs build-base"; fi
+  if ! command_exists python3 && ! command_exists python; then missing_pkgs="$missing_pkgs python3"; fi
+  if ! command_exists cmake; then missing_pkgs="$missing_pkgs cmake"; fi
+
+  if [[ -n "$missing_pkgs" ]]; then
+    info "installing build tools via apk:$missing_pkgs"
+    # shellcheck disable=SC2086
+    apk add --quiet $missing_pkgs >/dev/null 2>&1 || die "failed to install$missing_pkgs via apk"
+    info "build tools installed"
+  fi
+}
+
+ensure_build_tools_arch() {
+  local missing_pkgs=""
+
+  if ! command_exists git; then missing_pkgs="$missing_pkgs git"; fi
+  if ! command_exists make || ! command_exists g++; then missing_pkgs="$missing_pkgs base-devel"; fi
+  if ! command_exists python3 && ! command_exists python; then missing_pkgs="$missing_pkgs python"; fi
+  if ! command_exists cmake; then missing_pkgs="$missing_pkgs cmake"; fi
+
+  if [[ -n "$missing_pkgs" ]]; then
+    info "installing build tools via pacman:$missing_pkgs"
+    # shellcheck disable=SC2086
+    pacman -S --noconfirm --needed $missing_pkgs >/dev/null 2>&1 || die "failed to install$missing_pkgs via pacman"
+    info "build tools installed"
+  fi
+}
+
+ensure_build_tools_suse() {
+  local missing_pkgs=""
+
+  if ! command_exists git; then missing_pkgs="$missing_pkgs git"; fi
+  if ! command_exists make; then missing_pkgs="$missing_pkgs make"; fi
+  if ! command_exists g++ && ! command_exists c++; then missing_pkgs="$missing_pkgs gcc-c++"; fi
+  if ! command_exists python3 && ! command_exists python; then missing_pkgs="$missing_pkgs python3"; fi
+  if ! command_exists cmake; then missing_pkgs="$missing_pkgs cmake"; fi
+
+  if [[ -n "$missing_pkgs" ]]; then
+    info "installing build tools via zypper:$missing_pkgs"
+    # shellcheck disable=SC2086
+    zypper install -y $missing_pkgs >/dev/null 2>&1 || die "failed to install$missing_pkgs via zypper"
+    info "build tools installed"
+  fi
+}
+
+ensure_build_tools_macos() {
+  if ! xcode-select -p >/dev/null 2>&1; then
+    info "installing Xcode Command Line Tools..."
+    xcode-select --install 2>/dev/null || true
+    until xcode-select -p >/dev/null 2>&1; do
+      info "waiting for Xcode Command Line Tools installation..."
+      sleep 5
+    done
+    info "Xcode Command Line Tools installed"
+  fi
+
+  if ! command_exists cmake; then
+    if command_exists brew; then
+      info "installing cmake via Homebrew..."
+      brew install cmake >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
+ensure_build_tools() {
+  local os distro
+  os="$(detect_os)"
+  distro="$(detect_distro)"
+
+  info "checking build prerequisites (${distro})..."
+
+  case "$distro" in
+    macos)
+      ensure_build_tools_macos
+      ;;
+    debian)
+      ensure_build_tools_debian
+      ;;
+    rhel)
+      local sys_pm
+      if command_exists dnf; then sys_pm="dnf"; else sys_pm="yum"; fi
+      ensure_build_tools_rhel "$sys_pm"
+      ;;
+    alpine)
+      ensure_build_tools_alpine
+      ;;
+    arch)
+      ensure_build_tools_arch
+      ;;
+    suse)
+      ensure_build_tools_suse
+      ;;
+    *)
+      local sys_pm
+      sys_pm="$(detect_system_package_manager)"
+      if [[ -z "$sys_pm" ]]; then
+        warn "unknown distro and no package manager found; skipping build tool check"
+        return 0
+      fi
+      local missing_pkgs=""
+      if ! command_exists git; then missing_pkgs="$missing_pkgs git"; fi
+      if ! command_exists make; then missing_pkgs="$missing_pkgs make"; fi
+      if ! command_exists g++ && ! command_exists c++; then missing_pkgs="$missing_pkgs g++"; fi
+      if [[ -n "$missing_pkgs" ]]; then
+        info "installing build tools via $sys_pm:$missing_pkgs"
+        case "$sys_pm" in
+          apt) apt-get update -qq >/dev/null 2>&1 || true; apt-get install -y -qq $missing_pkgs >/dev/null 2>&1 || true ;;
+          dnf|yum) $sys_pm install -y -q $missing_pkgs >/dev/null 2>&1 || true ;;
+          *) warn "could not install build tools automatically" ;;
+        esac
+      fi
+      ;;
+  esac
+
+  if [[ "$distro" != "macos" ]] && cmake_needs_upgrade; then
     local current_cmake
     current_cmake="$(cmake_version)"
     if [[ -n "$current_cmake" ]]; then
@@ -321,23 +505,21 @@ ensure_build_tools() {
     else
       info "CMake not found; installing..."
     fi
-    local arch
-    arch="$(uname -m)"
-    if [[ "$arch" == "x86_64" ]]; then
-      install_cmake_from_source
-    else
+    install_cmake_binary || {
+      warn "could not install CMake binary; trying system package manager..."
+      local sys_pm
+      sys_pm="$(detect_system_package_manager)"
       case "$sys_pm" in
-        apt)
-          apt-get install -y -qq cmake >/dev/null 2>&1 || true
-          ;;
-        yum|dnf)
-          "$sys_pm" install -y -q cmake >/dev/null 2>&1 || true
-          ;;
+        apt) apt-get install -y -qq cmake >/dev/null 2>&1 || true ;;
+        dnf|yum) "$sys_pm" install -y -q cmake >/dev/null 2>&1 || true ;;
+        apk) apk add --quiet cmake >/dev/null 2>&1 || true ;;
+        pacman) pacman -S --noconfirm cmake >/dev/null 2>&1 || true ;;
+        zypper) zypper install -y cmake >/dev/null 2>&1 || true ;;
       esac
       if cmake_needs_upgrade; then
-        warn "system cmake is still too old; node-llama-cpp may fail to build"
+        warn "CMake is still too old ($(cmake_version)); node-llama-cpp may fail to build"
       fi
-    fi
+    }
   fi
 
   info "build prerequisites satisfied"

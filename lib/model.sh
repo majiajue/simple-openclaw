@@ -13,6 +13,36 @@ sync_openclaw_model_config() {
 
   [[ -n "$model_name" ]] || return 0
 
+  local existing_provider
+  existing_provider="$(jq -r '
+    .models.providers // {} | to_entries[]
+    | select(.value.baseUrl != null)
+    | .key' "$openclaw_config" 2>/dev/null | head -1 || true)"
+
+  if [[ -n "$existing_provider" ]]; then
+    local tmp="${openclaw_config}.tmp"
+    local model_ref="${existing_provider}/${model_name}"
+
+    local jq_expr='.agents.defaults.model.primary = $model
+      | .agents.defaults.models[$model] = { alias: $alias }'
+
+    if [[ -n "$base_url" ]]; then
+      jq_expr="${jq_expr} | .models.providers[\$prov].baseUrl = \$baseUrl"
+    fi
+
+    if [[ -n "$api_key" ]]; then
+      jq_expr="${jq_expr} | .models.providers[\$prov].apiKey = \$apiKey"
+    fi
+
+    jq --arg model "$model_ref" --arg alias "$model_name" \
+       --arg prov "$existing_provider" \
+       --arg baseUrl "${base_url:-}" --arg apiKey "${api_key:-}" \
+       "$jq_expr" \
+       "$openclaw_config" >"$tmp"
+    mv "$tmp" "$openclaw_config"
+    return 0
+  fi
+
   local provider_prefix
   case "$provider" in
     anthropic) provider_prefix="anthropic" ;;

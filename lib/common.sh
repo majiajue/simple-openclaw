@@ -132,13 +132,14 @@ auto_install_node() {
   rm -rf "$tmp_dir"
 
   export PATH="${install_prefix}/bin:$PATH"
+  hash -r 2>/dev/null || true
 
   local installed
-  installed="$(node_version)"
+  installed="$("${install_prefix}/bin/node" -v 2>/dev/null || true)"
   if [[ -z "$installed" ]]; then
     die "Node.js auto-install failed; binary is not functional after extraction"
   fi
-  info "Node.js v${installed} installed successfully"
+  info "Node.js ${installed} installed successfully"
 }
 
 node_version() {

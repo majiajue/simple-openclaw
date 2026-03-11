@@ -343,6 +343,7 @@ ensure_build_tools_debian() {
   local sys_pm="apt"
   local missing_pkgs=""
 
+  if ! command_exists jq; then missing_pkgs="$missing_pkgs jq"; fi
   if ! command_exists git; then missing_pkgs="$missing_pkgs git"; fi
   if ! command_exists make; then missing_pkgs="$missing_pkgs build-essential"; fi
   if ! command_exists g++ && ! command_exists c++; then missing_pkgs="$missing_pkgs build-essential"; fi
@@ -363,6 +364,7 @@ ensure_build_tools_rhel() {
   local sys_pm="$1"
   local missing_pkgs=""
 
+  if ! command_exists jq; then missing_pkgs="$missing_pkgs jq"; fi
   if ! command_exists git; then missing_pkgs="$missing_pkgs git"; fi
   if ! command_exists make; then missing_pkgs="$missing_pkgs make"; fi
   if ! command_exists g++ && ! command_exists c++; then missing_pkgs="$missing_pkgs gcc-c++"; fi
@@ -382,6 +384,7 @@ ensure_build_tools_rhel() {
 ensure_build_tools_alpine() {
   local missing_pkgs=""
 
+  if ! command_exists jq; then missing_pkgs="$missing_pkgs jq"; fi
   if ! command_exists git; then missing_pkgs="$missing_pkgs git"; fi
   if ! command_exists make || ! command_exists g++; then missing_pkgs="$missing_pkgs build-base"; fi
   if ! command_exists python3 && ! command_exists python; then missing_pkgs="$missing_pkgs python3"; fi
@@ -398,6 +401,7 @@ ensure_build_tools_alpine() {
 ensure_build_tools_arch() {
   local missing_pkgs=""
 
+  if ! command_exists jq; then missing_pkgs="$missing_pkgs jq"; fi
   if ! command_exists git; then missing_pkgs="$missing_pkgs git"; fi
   if ! command_exists make || ! command_exists g++; then missing_pkgs="$missing_pkgs base-devel"; fi
   if ! command_exists python3 && ! command_exists python; then missing_pkgs="$missing_pkgs python"; fi
@@ -414,6 +418,7 @@ ensure_build_tools_arch() {
 ensure_build_tools_suse() {
   local missing_pkgs=""
 
+  if ! command_exists jq; then missing_pkgs="$missing_pkgs jq"; fi
   if ! command_exists git; then missing_pkgs="$missing_pkgs git"; fi
   if ! command_exists make; then missing_pkgs="$missing_pkgs make"; fi
   if ! command_exists g++ && ! command_exists c++; then missing_pkgs="$missing_pkgs gcc-c++"; fi
@@ -439,8 +444,12 @@ ensure_build_tools_macos() {
     info "Xcode Command Line Tools installed"
   fi
 
-  if ! command_exists cmake; then
-    if command_exists brew; then
+  if command_exists brew; then
+    if ! command_exists jq; then
+      info "installing jq via Homebrew..."
+      brew install jq >/dev/null 2>&1 || true
+    fi
+    if ! command_exists cmake; then
       info "installing cmake via Homebrew..."
       brew install cmake >/dev/null 2>&1 || true
     fi
@@ -483,6 +492,7 @@ ensure_build_tools() {
         return 0
       fi
       local missing_pkgs=""
+      if ! command_exists jq; then missing_pkgs="$missing_pkgs jq"; fi
       if ! command_exists git; then missing_pkgs="$missing_pkgs git"; fi
       if ! command_exists make; then missing_pkgs="$missing_pkgs make"; fi
       if ! command_exists g++ && ! command_exists c++; then missing_pkgs="$missing_pkgs g++"; fi

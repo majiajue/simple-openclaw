@@ -74,8 +74,21 @@ cat >"$FAKE_BIN_DIR/python3" <<EOF
 exit 0
 EOF
 
+cat >"$FAKE_BIN_DIR/jq" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "-Rn" ]] || [[ "\${1:-}" == "-r" ]] || [[ "\${1:-}" == "-e" ]]; then
+  echo "[]"
+  exit 0
+fi
+if [[ "\${1:-}" == "empty" ]]; then exit 0; fi
+if [[ "\${1:-}" == "--arg" ]]; then echo "{}"; exit 0; fi
+echo "{}"
+exit 0
+EOF
+
 chmod +x "$FAKE_BIN_DIR/node" "$FAKE_BIN_DIR/cmake" "$FAKE_BIN_DIR/g++" \
-         "$FAKE_BIN_DIR/make" "$FAKE_BIN_DIR/git" "$FAKE_BIN_DIR/python3"
+         "$FAKE_BIN_DIR/make" "$FAKE_BIN_DIR/git" "$FAKE_BIN_DIR/python3" \
+         "$FAKE_BIN_DIR/jq"
 
 "$ROOT_DIR/bin/simple-openclaw" install --channel stable >/dev/null
 "$ROOT_DIR/bin/simple-openclaw" init >/dev/null

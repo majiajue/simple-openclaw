@@ -103,15 +103,52 @@ auto_install_node() {
     warn "could not resolve latest version, falling back to $node_ver"
   fi
 
-  tarball="node-${node_ver}-${os}-${arch}.tar.xz"
-  url="https://nodejs.org/dist/${node_ver}/${tarball}"
+  local use_unofficial=0
+  if [[ "$os" == "linux" ]]; then
+    local glibc_ver
+    glibc_ver="$(ldd --version 2>&1 | head -n1 | grep -oE '[0-9]+\.[0-9]+$' || true)"
+    if [[ -n "$glibc_ver" ]]; then
+      local glibc_major glibc_minor
+      glibc_major="${glibc_ver%%.*}"
+      glibc_minor="${glibc_ver##*.}"
+      if [[ "$glibc_major" -lt 2 ]] || { [[ "$glibc_major" -eq 2 ]] && [[ "$glibc_minor" -lt 28 ]]; }; then
+        info "detected GLIBC ${glibc_ver} (< 2.28); using unofficial-builds for compatibility"
+        use_unofficial=1
+      fi
+    fi
+  fi
+
+  if [[ "$use_unofficial" -eq 1 ]]; then
+    tarball="node-${node_ver}-${os}-${arch}.tar.xz"
+    url="https://unofficial-builds.nodejs.org/download/release/${node_ver}/${tarball}"
+  else
+    tarball="node-${node_ver}-${os}-${arch}.tar.xz"
+    url="https://nodejs.org/dist/${node_ver}/${tarball}"
+  fi
+
   tmp_dir="$(mktemp -d)"
 
   info "downloading Node.js ${node_ver} for ${os}-${arch}..."
   if command_exists curl; then
-    curl -fsSL "$url" -o "${tmp_dir}/${tarball}" || die "failed to download Node.js from $url"
+    curl -fsSL "$url" -o "${tmp_dir}/${tarball}" || {
+      if [[ "$use_unofficial" -eq 0 ]]; then
+        die "failed to download Node.js from $url"
+      fi
+      warn "unofficial-builds download failed; trying official build as fallback"
+      url="https://nodejs.org/dist/${node_ver}/${tarball}"
+      curl -fsSL "$url" -o "${tmp_dir}/${tarball}" || die "failed to download Node.js from $url"
+      use_unofficial=0
+    }
   elif command_exists wget; then
-    wget -q "$url" -O "${tmp_dir}/${tarball}" || die "failed to download Node.js from $url"
+    wget -q "$url" -O "${tmp_dir}/${tarball}" || {
+      if [[ "$use_unofficial" -eq 0 ]]; then
+        die "failed to download Node.js from $url"
+      fi
+      warn "unofficial-builds download failed; trying official build as fallback"
+      url="https://nodejs.org/dist/${node_ver}/${tarball}"
+      wget -q "$url" -O "${tmp_dir}/${tarball}" || die "failed to download Node.js from $url"
+      use_unofficial=0
+    }
   else
     die "curl or wget is required to auto-install Node.js"
   fi
@@ -137,7 +174,9 @@ auto_install_node() {
   local installed
   installed="$("${install_prefix}/bin/node" -v 2>/dev/null || true)"
   if [[ -z "$installed" ]]; then
-    die "Node.js auto-install failed; binary is not functional after extraction"
+    local diag
+    diag="$("${install_prefix}/bin/node" -v 2>&1 || true)"
+    die "Node.js auto-install failed; binary is not functional after extraction: $diag"
   fi
   info "Node.js ${installed} installed successfully"
 }

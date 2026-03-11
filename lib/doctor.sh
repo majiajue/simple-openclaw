@@ -37,10 +37,16 @@ run_doctor() {
     printf 'timestamp=%s\n' "$(iso_now)"
     printf 'version=%s\n' "$(current_version)"
     if command_exists node; then
-      printf 'node=%s\n' "$(node -v)"
-      if [[ "$(node_major_version)" -lt 22 ]]; then
+      local node_ver
+      node_ver="$(node_version)"
+      if [[ -z "$node_ver" ]]; then
+        printf 'node=broken\n'
+        printf 'check=fail scope=node reason=not_functional\n'
+      elif [[ "$(node_major_version)" -lt 22 ]]; then
+        printf 'node=v%s\n' "$node_ver"
         printf 'check=fail scope=node reason=unsupported_version\n'
       else
+        printf 'node=v%s\n' "$node_ver"
         printf 'check=ok scope=node\n'
       fi
     else

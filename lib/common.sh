@@ -73,7 +73,9 @@ detect_service_manager() {
 
 node_version() {
   if command_exists node; then
-    node -v | sed 's/^v//'
+    local raw
+    raw="$(node -v 2>/dev/null)" || { printf ''; return; }
+    printf '%s' "$raw" | sed 's/^v//'
   else
     printf ''
   fi

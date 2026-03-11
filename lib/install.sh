@@ -42,9 +42,14 @@ simple_openclaw_install() {
       ensure_runtime_dirs
       info "detected operating system: $os"
       if command_exists node; then
-        info "detected Node.js $(node -v)"
+        local node_ver
+        node_ver="$(node_version)"
+        if [[ -z "$node_ver" ]]; then
+          die "Node.js binary found but is not functional (run 'node -v' to diagnose); install a working Node.js 22+ before deploying OpenClaw"
+        fi
+        info "detected Node.js v${node_ver}"
         if [[ "$node_major" -lt 22 ]]; then
-          die "Node.js 22+ is required, found $(node -v)"
+          die "Node.js 22+ is required, found v${node_ver}"
         fi
       else
         die "Node.js is not installed; install Node.js 22+ before deploying OpenClaw"

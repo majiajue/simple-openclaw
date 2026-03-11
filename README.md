@@ -76,27 +76,41 @@ Generate the base configuration files under `~/.simple-openclaw/config/`.
 
 ### Step 3: Configure Your Model
 
-Set up the LLM provider. Supports any OpenAI-compatible API endpoint.
+Set up the LLM provider. Supports Anthropic, OpenAI, and any third-party proxy/relay API.
 
-**Claude (Anthropic):**
+**Third-party proxy / relay API (recommended for China users):**
+
+If you use a third-party API relay service (e.g. pikachu.claudecode.love), configure it as follows:
+
+```bash
+./bin/simple-openclaw model set \
+  --base-url https://your-relay-host.com \
+  --model claude-opus-4-6 \
+  --provider anthropic \
+  --api-key your-relay-api-key
+```
+
+This generates the complete OpenClaw provider config including `apiKey`, `auth`, `models` array, and `auth.profiles`. The provider ID is auto-generated from the base URL (e.g. `custom-your-relay-host-com`).
+
+If you already configured OpenClaw via `openclaw onboard`, `model set` will detect and update the existing provider instead of creating a new one.
+
+**Claude (direct Anthropic API):**
 
 ```bash
 ./bin/simple-openclaw model set \
   --base-url https://api.anthropic.com/v1 \
   --model claude-sonnet-4-20250514 \
-  --provider anthropic
-
-./bin/simple-openclaw secret set model.api_key your-api-key
+  --provider anthropic \
+  --api-key your-api-key
 ```
 
-**OpenAI:**
+**OpenAI (direct):**
 
 ```bash
 ./bin/simple-openclaw model set \
   --base-url https://api.openai.com/v1 \
-  --model gpt-4.1
-
-./bin/simple-openclaw secret set model.api_key your-api-key
+  --model gpt-4.1 \
+  --api-key your-api-key
 ```
 
 **Other OpenAI-compatible providers:**
@@ -104,10 +118,11 @@ Set up the LLM provider. Supports any OpenAI-compatible API endpoint.
 ```bash
 ./bin/simple-openclaw model set \
   --base-url https://your-api-provider.com/v1 \
-  --model your-model-name
-
-./bin/simple-openclaw secret set model.api_key your-api-key
+  --model your-model-name \
+  --api-key your-api-key
 ```
+
+> **Note:** `--api-key` can also be set separately via `./bin/simple-openclaw secret set model.api_key your-key`
 
 ### Step 4 (Optional): Add a Channel
 
@@ -141,6 +156,16 @@ Verify everything is configured correctly.
 ./bin/simple-openclaw probe
 ```
 
+### Step 8: Start Chatting
+
+```bash
+# Open the terminal chat UI
+./bin/simple-openclaw chat
+
+# Or send a single message
+./bin/simple-openclaw agent --message "hello"
+```
+
 ## Command Highlights
 
 ```text
@@ -153,10 +178,15 @@ simple-openclaw restart
 simple-openclaw status
 simple-openclaw probe
 
+simple-openclaw chat
+simple-openclaw tui
+simple-openclaw agent --message <text>
+
 simple-openclaw doctor
 simple-openclaw doctor --fix
 
-simple-openclaw model set
+simple-openclaw model set --base-url <url> --model <name> --provider <type> --api-key <key>
+simple-openclaw model list
 simple-openclaw model test
 
 simple-openclaw channel add <name>
@@ -250,6 +280,10 @@ packaging/   install and release helpers
 
 - `install` auto-installs Node.js 22+ if missing (supports GLIBC 2.17+ via unofficial-builds)
 - `install` auto-installs build tools (cmake, g++, make) based on your OS
+- `model set` supports `--api-key` inline or separate `secret set model.api_key`
+- `model set` with `--provider anthropic` and a third-party base URL auto-generates the full provider config (apiKey, auth, models array, auth.profiles)
+- `model set` detects existing providers from `openclaw onboard` and updates them instead of creating duplicates
+- `chat`/`tui`/`agent` commands bypass `#!/usr/bin/env node` shebang issues on old GLIBC systems
 - native modules like `node-llama-cpp` may fail to compile on older systems; this is non-blocking — OpenClaw works fine with remote API providers
 - the wrapper currently uses shell scripts for speed and portability
 - if `openclaw` is not on `PATH`, you can still set `OPENCLAW_BIN` manually

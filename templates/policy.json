@@ -1,0 +1,17 @@
+{
+  "plugins": {
+    "allow": [
+      "@openclaw/feishu",
+      "qqbot"
+    ],
+    "pinVersions": true
+  },
+  "update": {
+    "track": "stable",
+    "autoBackup": true
+  },
+  "security": {
+    "strictPermissions": true,
+    "scanLogsForSecrets": true
+  }
+}

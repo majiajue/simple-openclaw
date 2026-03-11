@@ -1,0 +1,13 @@
+{
+  "name": "qq",
+  "plugin": "qqbot",
+  "enabled": true,
+  "required": [
+    "app_id",
+    "app_secret"
+  ],
+  "credentials": {
+    "app_id": "",
+    "app_secret": ""
+  }
+}

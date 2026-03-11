@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=../lib/common.sh
+source "$ROOT_DIR/lib/common.sh"
+
+usage() {
+  cat <<'EOF'
+simple-openclaw v2.0
+
+Usage:
+  simple-openclaw <command> [subcommand] [options]
+
+Core:
+  install | init | uninstall
+  start | stop | restart | status | probe
+  health | doctor
+
+Domains:
+  model <set|list|test>
+  channel <list|add|edit|remove|test>
+  plugin <list|install|enable|disable|pin|audit|doctor>
+  backup <create|list|verify>
+  restore <file>
+  rollback <snapshot-id>
+  update [--check|--target <ver>]
+  release <list|stable>
+  secret <set|list|rotate|audit>
+  security [audit|harden]
+  repair <stale-process|port|service>
+  watchdog <enable|disable|status>
+  logs [--follow|--since <window>]
+  support-bundle
+
+Examples:
+  simple-openclaw install
+  simple-openclaw model set --base-url https://api.openai.com/v1 --model gpt-4.1
+  simple-openclaw channel add feishu
+  simple-openclaw plugin audit
+  simple-openclaw doctor --fix
+EOF
+}
+
+dispatch_module() {
+  local module="$1"
+  shift || true
+  # shellcheck source=/dev/null
+  source "$ROOT_DIR/lib/${module}.sh"
+  "simple_openclaw_${module}" "$@"
+}
+
+main() {
+  local command="${1:-help}"
+  shift || true
+
+  case "$command" in
+    help|-h|--help)
+      usage
+      ;;
+    *)
+      ensure_runtime_dirs
+      ;;
+  esac
+
+  case "$command" in
+    help|-h|--help)
+      ;;
+    install|uninstall)
+      dispatch_module install "$command" "$@"
+      ;;
+    init)
+      dispatch_module init "$@"
+      ;;
+    start|stop|restart|status)
+      dispatch_module service "$command" "$@"
+      ;;
+    probe)
+      dispatch_module probe "$@"
+      ;;
+    health)
+      dispatch_module doctor health "$@"
+      ;;
+    doctor)
+      dispatch_module doctor doctor "$@"
+      ;;
+    model)
+      dispatch_module model "$@"
+      ;;
+    channel)
+      dispatch_module channel "$@"
+      ;;
+    plugin)
+      dispatch_module plugin "$@"
+      ;;
+    backup)
+      dispatch_module backup "$@"
+      ;;
+    restore)
+      dispatch_module backup restore "$@"
+      ;;
+    rollback)
+      dispatch_module backup rollback "$@"
+      ;;
+    update)
+      dispatch_module update "$@"
+      ;;
+    release)
+      dispatch_module update release "$@"
+      ;;
+    secret)
+      dispatch_module secret "$@"
+      ;;
+    security)
+      dispatch_module security "$@"
+      ;;
+    repair)
+      dispatch_module repair "$@"
+      ;;
+    watchdog)
+      dispatch_module watchdog "$@"
+      ;;
+    logs)
+      dispatch_module logs "$@"
+      ;;
+    support-bundle)
+      dispatch_module bundle "$@"
+      ;;
+    *)
+      die "unknown command: $command"
+      ;;
+  esac
+}
+
+main "$@"

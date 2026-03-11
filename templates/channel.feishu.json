@@ -1,0 +1,15 @@
+{
+  "name": "feishu",
+  "plugin": "@openclaw/feishu",
+  "enabled": true,
+  "required": [
+    "app_id",
+    "app_secret",
+    "verification_token"
+  ],
+  "credentials": {
+    "app_id": "",
+    "app_secret": "",
+    "verification_token": ""
+  }
+}

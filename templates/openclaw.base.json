@@ -1,0 +1,10 @@
+{
+  "gateway": {
+    "port": 18789
+  },
+  "model": {
+    "provider": "openai-compatible",
+    "baseUrl": "",
+    "name": ""
+  }
+}

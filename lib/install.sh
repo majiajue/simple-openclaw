@@ -64,6 +64,7 @@ simple_openclaw_install() {
         auto_install_node 22
         node_major="$(node_major_version)"
         pm="$(package_manager)"
+        pkg="$(openclaw_npm_package)"
       fi
       ensure_supported_package_manager "$pm"
       info "detected package manager: $pm"

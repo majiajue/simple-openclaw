@@ -220,7 +220,13 @@ openclaw_bin() {
 }
 
 gateway_port() {
-  env_get OPENCLAW_GATEWAY_PORT || printf '%s' "$DEFAULT_GATEWAY_PORT"
+  local val
+  val="$(env_get OPENCLAW_GATEWAY_PORT || true)"
+  if [[ -n "$val" ]]; then
+    printf '%s' "$val"
+  else
+    printf '%s' "$DEFAULT_GATEWAY_PORT"
+  fi
 }
 
 gateway_command() {
@@ -242,11 +248,23 @@ package_manager() {
 }
 
 openclaw_npm_package() {
-  env_get OPENCLAW_NPM_PACKAGE || printf '%s' "$DEFAULT_OPENCLAW_NPM_PACKAGE"
+  local val
+  val="$(env_get OPENCLAW_NPM_PACKAGE || true)"
+  if [[ -n "$val" ]]; then
+    printf '%s' "$val"
+  else
+    printf '%s' "$DEFAULT_OPENCLAW_NPM_PACKAGE"
+  fi
 }
 
 update_channel() {
-  env_get OPENCLAW_UPDATE_CHANNEL || printf 'stable'
+  local val
+  val="$(env_get OPENCLAW_UPDATE_CHANNEL || true)"
+  if [[ -n "$val" ]]; then
+    printf '%s' "$val"
+  else
+    printf 'stable'
+  fi
 }
 
 channel_to_dist_tag() {

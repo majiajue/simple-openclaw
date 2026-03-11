@@ -52,24 +52,69 @@ This repository already includes a working shell-based CLI scaffold with real co
 
 ## Quick Start
 
-```bash
-./bin/simple-openclaw install --channel stable
-./bin/simple-openclaw init
+### Step 1: Install OpenClaw
 
+Clone the repository and run the install command. This will automatically:
+- Detect your OS and architecture
+- Install Node.js 22+ if missing or broken (supports old GLIBC systems)
+- Install build tools (cmake, g++, make) if missing
+- Install OpenClaw via npm
+
+```bash
+git clone https://github.com/majiajue/simple-openclaw.git
+cd simple-openclaw
+./bin/simple-openclaw install --channel stable
+```
+
+### Step 2: Initialize Configuration
+
+Generate the base configuration files under `~/.simple-openclaw/config/`.
+
+```bash
+./bin/simple-openclaw init
+```
+
+### Step 3: Configure Your Model
+
+Set up the LLM provider. Replace the URL and model name with your own.
+
+```bash
 ./bin/simple-openclaw model set \
   --base-url https://api.openai.com/v1 \
   --model gpt-4.1
 
 ./bin/simple-openclaw secret set model.api_key sk-xxxx
+```
 
+### Step 4: Add a Channel
+
+Add a messaging channel (e.g. feishu, qq) and fill in the credentials.
+
+```bash
 ./bin/simple-openclaw channel add feishu
 ./bin/simple-openclaw channel edit feishu --set app_id=your-app-id
 ./bin/simple-openclaw channel edit feishu --set app_secret=your-app-secret
 ./bin/simple-openclaw channel edit feishu --set verification_token=your-token
+```
 
+### Step 5: Install the Channel Plugin
+
+```bash
 ./bin/simple-openclaw plugin install @openclaw/feishu --pin
+```
 
+### Step 6: Run Health Check
+
+Verify everything is configured correctly.
+
+```bash
 ./bin/simple-openclaw doctor
+```
+
+### Step 7: Start the Service
+
+```bash
+./bin/simple-openclaw start
 ./bin/simple-openclaw probe
 ```
 
@@ -180,7 +225,9 @@ packaging/   install and release helpers
 
 ## Notes
 
-- `install` requires Node.js 22+
+- `install` auto-installs Node.js 22+ if missing (supports GLIBC 2.17+ via unofficial-builds)
+- `install` auto-installs build tools (cmake, g++, make) based on your OS
+- native modules like `node-llama-cpp` may fail to compile on older systems; this is non-blocking — OpenClaw works fine with remote API providers
 - the wrapper currently uses shell scripts for speed and portability
 - if `openclaw` is not on `PATH`, you can still set `OPENCLAW_BIN` manually
 - configuration lives in `~/.simple-openclaw`, not in the repository

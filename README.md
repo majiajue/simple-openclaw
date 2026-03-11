@@ -109,9 +109,9 @@ Set up the LLM provider. Supports any OpenAI-compatible API endpoint.
 ./bin/simple-openclaw secret set model.api_key your-api-key
 ```
 
-### Step 4: Add a Channel
+### Step 4 (Optional): Add a Channel
 
-Add a messaging channel (e.g. feishu, qq) and fill in the credentials.
+Skip this step if you don't need to connect to a messaging platform. Channels are only needed for integrations like Feishu or QQ.
 
 ```bash
 ./bin/simple-openclaw channel add feishu
@@ -120,7 +120,7 @@ Add a messaging channel (e.g. feishu, qq) and fill in the credentials.
 ./bin/simple-openclaw channel edit feishu --set verification_token=your-token
 ```
 
-### Step 5: Install the Channel Plugin
+### Step 5 (Optional): Install the Channel Plugin
 
 ```bash
 ./bin/simple-openclaw plugin install @openclaw/feishu --pin

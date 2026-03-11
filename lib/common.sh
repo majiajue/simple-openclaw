@@ -119,13 +119,14 @@ auto_install_node() {
   fi
 
   if [[ "$use_unofficial" -eq 1 ]]; then
-    tarball="node-${node_ver}-${os}-${arch}.tar.xz"
+    tarball="node-${node_ver}-${os}-${arch}-glibc-217.tar.xz"
     url="https://unofficial-builds.nodejs.org/download/release/${node_ver}/${tarball}"
   else
     tarball="node-${node_ver}-${os}-${arch}.tar.xz"
     url="https://nodejs.org/dist/${node_ver}/${tarball}"
   fi
 
+  local extracted_name="node-${node_ver}-${os}-${arch}"
   tmp_dir="$(mktemp -d)"
 
   info "downloading Node.js ${node_ver} for ${os}-${arch}..."
@@ -135,6 +136,7 @@ auto_install_node() {
         die "failed to download Node.js from $url"
       fi
       warn "unofficial-builds download failed; trying official build as fallback"
+      tarball="node-${node_ver}-${os}-${arch}.tar.xz"
       url="https://nodejs.org/dist/${node_ver}/${tarball}"
       curl -fsSL "$url" -o "${tmp_dir}/${tarball}" || die "failed to download Node.js from $url"
       use_unofficial=0
@@ -145,6 +147,7 @@ auto_install_node() {
         die "failed to download Node.js from $url"
       fi
       warn "unofficial-builds download failed; trying official build as fallback"
+      tarball="node-${node_ver}-${os}-${arch}.tar.xz"
       url="https://nodejs.org/dist/${node_ver}/${tarball}"
       wget -q "$url" -O "${tmp_dir}/${tarball}" || die "failed to download Node.js from $url"
       use_unofficial=0
@@ -156,7 +159,10 @@ auto_install_node() {
   local install_prefix="/usr/local"
   info "extracting Node.js to ${install_prefix}..."
   tar -xJf "${tmp_dir}/${tarball}" -C "$tmp_dir"
-  local extracted_dir="${tmp_dir}/node-${node_ver}-${os}-${arch}"
+  local extracted_dir="${tmp_dir}/${extracted_name}"
+  if [[ ! -d "$extracted_dir" ]]; then
+    extracted_dir="${tmp_dir}/${tarball%.tar.xz}"
+  fi
 
   cp -f "${extracted_dir}/bin/node" "${install_prefix}/bin/node"
   cp -rf "${extracted_dir}/lib/node_modules" "${install_prefix}/lib/node_modules"

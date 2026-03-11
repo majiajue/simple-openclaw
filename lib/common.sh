@@ -2,6 +2,11 @@
 
 set -euo pipefail
 
+case ":$PATH:" in
+  *:/usr/local/bin:*) ;;
+  *) export PATH="/usr/local/bin:$PATH" ;;
+esac
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SIMPLE_OPENCLAW_HOME="${SIMPLE_OPENCLAW_HOME:-$HOME/.simple-openclaw}"
 CONFIG_DIR="$SIMPLE_OPENCLAW_HOME/config"

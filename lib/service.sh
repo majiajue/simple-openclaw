@@ -30,7 +30,7 @@ simple_openclaw_service() {
         if pid_is_running "$tracked_pid" || [[ -n "$pid" ]]; then
           warn "gateway already appears to be running"
         else
-          nohup bash -lc "$gateway_cmd" >>"$LOG_DIR/openclaw-gateway.log" 2>&1 &
+          nohup bash -lc "export PATH=/usr/local/bin:\$PATH; $gateway_cmd" >>"$LOG_DIR/openclaw-gateway.log" 2>&1 &
           record_gateway_pid "$!"
           info "started gateway command: $gateway_cmd"
         fi

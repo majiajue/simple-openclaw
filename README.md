@@ -76,14 +76,14 @@ Generate the base configuration files under `~/.simple-openclaw/config/`.
 
 ### Step 3: Configure Your Model
 
-Set up the LLM provider. Replace the URL and model name with your own.
+Set up the LLM provider. Supports any OpenAI-compatible API endpoint.
 
 ```bash
 ./bin/simple-openclaw model set \
-  --base-url https://api.openai.com/v1 \
-  --model gpt-4.1
+  --base-url https://your-api-provider.com/v1 \
+  --model your-model-name
 
-./bin/simple-openclaw secret set model.api_key sk-xxxx
+./bin/simple-openclaw secret set model.api_key your-api-key
 ```
 
 ### Step 4: Add a Channel

@@ -69,6 +69,7 @@ simple_openclaw_install() {
       ensure_supported_package_manager "$pm"
       info "detected package manager: $pm"
       info "detected ${pm} $($pm -v)"
+      ensure_build_tools
       install_cmd="$(npm_global_install_cmd "$pm" "${pkg}@${version_or_tag}")"
       info "installing ${pkg}@${version_or_tag} via ${pm}"
       if [[ "$dry_run" == "1" ]]; then

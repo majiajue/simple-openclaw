@@ -187,6 +187,162 @@ auto_install_node() {
   info "Node.js ${installed} installed successfully"
 }
 
+detect_system_package_manager() {
+  if command_exists apt-get; then
+    printf 'apt'
+  elif command_exists yum; then
+    printf 'yum'
+  elif command_exists dnf; then
+    printf 'dnf'
+  elif command_exists apk; then
+    printf 'apk'
+  elif command_exists pacman; then
+    printf 'pacman'
+  elif command_exists zypper; then
+    printf 'zypper'
+  else
+    printf ''
+  fi
+}
+
+cmake_version() {
+  if command_exists cmake; then
+    cmake --version 2>/dev/null | head -n1 | grep -oE '[0-9]+\.[0-9]+' | head -n1
+  else
+    printf ''
+  fi
+}
+
+cmake_needs_upgrade() {
+  local ver major minor
+  ver="$(cmake_version)"
+  if [[ -z "$ver" ]]; then
+    return 0
+  fi
+  major="${ver%%.*}"
+  minor="${ver##*.}"
+  if [[ "$major" -lt 3 ]] || { [[ "$major" -eq 3 ]] && [[ "$minor" -lt 19 ]]; }; then
+    return 0
+  fi
+  return 1
+}
+
+install_cmake_from_source() {
+  local cmake_ver="3.28.6"
+  local tmp_dir url
+  tmp_dir="$(mktemp -d)"
+  url="https://github.com/Kitware/CMake/releases/download/v${cmake_ver}/cmake-${cmake_ver}-linux-x86_64.tar.gz"
+
+  info "downloading CMake ${cmake_ver} binary..."
+  if command_exists curl; then
+    curl -fsSL "$url" -o "${tmp_dir}/cmake.tar.gz" || die "failed to download CMake"
+  elif command_exists wget; then
+    wget -q "$url" -O "${tmp_dir}/cmake.tar.gz" || die "failed to download CMake"
+  fi
+
+  tar -xzf "${tmp_dir}/cmake.tar.gz" -C "$tmp_dir"
+  cp -f "${tmp_dir}/cmake-${cmake_ver}-linux-x86_64/bin/cmake" /usr/local/bin/cmake
+  cp -f "${tmp_dir}/cmake-${cmake_ver}-linux-x86_64/bin/ctest" /usr/local/bin/ctest
+  cp -f "${tmp_dir}/cmake-${cmake_ver}-linux-x86_64/bin/cpack" /usr/local/bin/cpack
+  cp -rf "${tmp_dir}/cmake-${cmake_ver}-linux-x86_64/share/cmake-3.28" /usr/local/share/cmake-3.28
+  chmod +x /usr/local/bin/cmake /usr/local/bin/ctest /usr/local/bin/cpack
+  rm -rf "$tmp_dir"
+  hash -r 2>/dev/null || true
+
+  info "CMake $(cmake --version 2>/dev/null | head -n1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+') installed"
+}
+
+ensure_build_tools() {
+  local os sys_pm missing_pkgs=""
+  os="$(detect_os)"
+  sys_pm="$(detect_system_package_manager)"
+
+  if [[ "$os" != "Linux" ]]; then
+    return 0
+  fi
+
+  info "checking build prerequisites..."
+
+  if ! command_exists git; then
+    missing_pkgs="$missing_pkgs git"
+  fi
+  if ! command_exists make; then
+    missing_pkgs="$missing_pkgs make"
+  fi
+  if ! command_exists g++ && ! command_exists c++; then
+    missing_pkgs="$missing_pkgs g++"
+  fi
+  if ! command_exists python3 && ! command_exists python; then
+    missing_pkgs="$missing_pkgs python3"
+  fi
+
+  if [[ -n "$missing_pkgs" ]]; then
+    if [[ -z "$sys_pm" ]]; then
+      die "missing build tools ($missing_pkgs) and no system package manager found; install them manually"
+    fi
+    info "installing build tools:$missing_pkgs"
+    case "$sys_pm" in
+      apt)
+        apt-get update -qq >/dev/null 2>&1 || true
+        # shellcheck disable=SC2086
+        apt-get install -y -qq $missing_pkgs >/dev/null 2>&1 || die "failed to install$missing_pkgs via apt"
+        ;;
+      yum)
+        # shellcheck disable=SC2086
+        yum install -y -q $missing_pkgs >/dev/null 2>&1 || die "failed to install$missing_pkgs via yum"
+        ;;
+      dnf)
+        # shellcheck disable=SC2086
+        dnf install -y -q $missing_pkgs >/dev/null 2>&1 || die "failed to install$missing_pkgs via dnf"
+        ;;
+      apk)
+        local apk_pkgs
+        apk_pkgs="$(printf '%s' "$missing_pkgs" | sed 's/g++/g++ build-base/')"
+        # shellcheck disable=SC2086
+        apk add --quiet $apk_pkgs >/dev/null 2>&1 || die "failed to install$missing_pkgs via apk"
+        ;;
+      pacman)
+        # shellcheck disable=SC2086
+        pacman -S --noconfirm --needed $missing_pkgs >/dev/null 2>&1 || die "failed to install$missing_pkgs via pacman"
+        ;;
+      zypper)
+        # shellcheck disable=SC2086
+        zypper install -y $missing_pkgs >/dev/null 2>&1 || die "failed to install$missing_pkgs via zypper"
+        ;;
+    esac
+    info "build tools installed"
+  fi
+
+  if cmake_needs_upgrade; then
+    local current_cmake
+    current_cmake="$(cmake_version)"
+    if [[ -n "$current_cmake" ]]; then
+      info "CMake ${current_cmake} is too old (need 3.19+); upgrading..."
+    else
+      info "CMake not found; installing..."
+    fi
+    local arch
+    arch="$(uname -m)"
+    if [[ "$arch" == "x86_64" ]]; then
+      install_cmake_from_source
+    else
+      case "$sys_pm" in
+        apt)
+          apt-get install -y -qq cmake >/dev/null 2>&1 || true
+          ;;
+        yum|dnf)
+          "$sys_pm" install -y -q cmake >/dev/null 2>&1 || true
+          ;;
+      esac
+      if cmake_needs_upgrade; then
+        warn "system cmake is still too old; node-llama-cpp may fail to build"
+      fi
+    fi
+  fi
+
+  info "build prerequisites satisfied"
+}
+
 node_version() {
   if command_exists node; then
     local raw

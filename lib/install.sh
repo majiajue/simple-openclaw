@@ -112,9 +112,108 @@ simple_openclaw_install() {
       info "next steps: simple-openclaw init && simple-openclaw doctor"
       ;;
     uninstall)
-      info "simple-openclaw code can be removed from $ROOT_DIR"
-      info "runtime data remains in $SIMPLE_OPENCLAW_HOME"
-      info "remove it manually if you want a full uninstall"
+      local purge=0 dry_run=0 keep_config=1
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --purge)
+            purge=1
+            shift
+            ;;
+          --dry-run)
+            dry_run=1
+            shift
+            ;;
+          --remove-config)
+            keep_config=0
+            shift
+            ;;
+          *)
+            die "unknown uninstall option: $1"
+            ;;
+        esac
+      done
+
+      # Stop the gateway if running
+      local tracked_pid
+      tracked_pid="$(read_gateway_pid || true)"
+      if pid_is_running "$tracked_pid" 2>/dev/null; then
+        info "stopping gateway (pid $tracked_pid)..."
+        if [[ "$dry_run" == "1" ]]; then
+          run_cmd --dry-run kill "$tracked_pid"
+        else
+          kill "$tracked_pid" >/dev/null 2>&1 || true
+          clear_gateway_pid
+        fi
+      fi
+
+      local port
+      port="$(gateway_port)"
+      local port_pid
+      port_pid="$(listener_pid_on_port "$port" 2>/dev/null || true)"
+      if [[ -n "$port_pid" ]]; then
+        info "stopping process on port $port (pid $port_pid)..."
+        if [[ "$dry_run" == "1" ]]; then
+          run_cmd --dry-run kill "$port_pid"
+        else
+          kill "$port_pid" >/dev/null 2>&1 || true
+        fi
+      fi
+
+      # Uninstall the npm global package
+      local pm pkg
+      pm="$(package_manager)"
+      pkg="$(openclaw_npm_package)"
+      if [[ -n "$pm" ]] && command_exists "$pm"; then
+        info "uninstalling $pkg via $pm..."
+        local uninstall_cmd
+        case "$pm" in
+          npm)  uninstall_cmd="npm uninstall -g $pkg" ;;
+          pnpm) uninstall_cmd="pnpm remove -g $pkg" ;;
+        esac
+        if [[ "$dry_run" == "1" ]]; then
+          run_cmd --dry-run bash -lc "$uninstall_cmd"
+        else
+          bash -lc "$uninstall_cmd" 2>&1 || warn "npm uninstall returned an error; package may already be removed"
+        fi
+      else
+        warn "package manager not found; skipping npm package removal"
+      fi
+
+      # Remove runtime data
+      if [[ "$purge" == "1" ]]; then
+        info "removing runtime data at $SIMPLE_OPENCLAW_HOME..."
+        if [[ "$dry_run" == "1" ]]; then
+          run_cmd --dry-run rm -rf "$SIMPLE_OPENCLAW_HOME"
+        else
+          rm -rf "$SIMPLE_OPENCLAW_HOME"
+        fi
+        info "runtime data removed"
+      else
+        info "runtime data preserved at $SIMPLE_OPENCLAW_HOME"
+        info "use --purge to remove it"
+      fi
+
+      # Remove OpenClaw config (~/.openclaw)
+      local openclaw_home="${HOME}/.openclaw"
+      if [[ "$keep_config" == "0" ]]; then
+        if [[ -d "$openclaw_home" ]]; then
+          info "removing OpenClaw config at $openclaw_home..."
+          if [[ "$dry_run" == "1" ]]; then
+            run_cmd --dry-run rm -rf "$openclaw_home"
+          else
+            rm -rf "$openclaw_home"
+          fi
+          info "OpenClaw config removed"
+        fi
+      else
+        if [[ -d "$openclaw_home" ]]; then
+          info "OpenClaw config preserved at $openclaw_home"
+          info "use --remove-config to remove it"
+        fi
+      fi
+
+      info "uninstall complete"
+      info "simple-openclaw source code remains at $ROOT_DIR"
       ;;
     *)
       die "unknown install action: $action"

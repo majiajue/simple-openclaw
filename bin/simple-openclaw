@@ -11,12 +11,18 @@ usage() {
 simple-openclaw v2.0
 
 Usage:
-  simple-openclaw <command> [subcommand] [options]
+  simple-openclaw [command] [subcommand] [options]
+
+  Run without arguments to open the interactive management menu.
 
 Core:
   install | init | uninstall
   start | stop | restart | status | probe
   health | doctor
+
+Interactive:
+  menu                    open interactive management menu (default)
+  setup                   run guided setup wizard
 
 Chat:
   chat                    open TUI chat (alias for tui)
@@ -26,7 +32,7 @@ Chat:
 Domains:
   model <set|list|test>
   channel <list|add|edit|remove|test>
-  plugin <list|install|enable|disable|pin|audit|doctor>
+  plugin <list|install|enable|disable|pin|audit|doctor|scan>
   backup <create|list|verify>
   restore <file>
   rollback <snapshot-id>
@@ -59,7 +65,7 @@ dispatch_module() {
 }
 
 main() {
-  local command="${1:-help}"
+  local command="${1:-menu}"
   shift || true
 
   case "$command" in
@@ -73,6 +79,12 @@ main() {
 
   case "$command" in
     help|-h|--help)
+      ;;
+    menu)
+      dispatch_module tui_menu menu "$@"
+      ;;
+    setup)
+      dispatch_module tui_menu wizard "$@"
       ;;
     install|uninstall)
       dispatch_module install "$command" "$@"

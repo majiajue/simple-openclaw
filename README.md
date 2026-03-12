@@ -1,5 +1,7 @@
 # simple-openclaw
 
+[![Buy Me A Coffee](https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png)](https://www.buymeacoffee.com/majiajue)
+
 `simple-openclaw` is an operations wrapper for [OpenClaw](https://docs.openclaw.ai/).
 
 It does not replace OpenClaw. It makes OpenClaw easier to install, safer to operate, and less fragile for normal users.
@@ -492,3 +494,7 @@ The fastest contributions right now are:
 - additional plugin scan heuristics
 
 If you want OpenClaw to feel more like a product than a raw toolkit, this project is pointed in that direction.
+
+## License
+
+This project is licensed under the [Apache License 2.0](./LICENSE).

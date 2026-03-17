@@ -29,6 +29,13 @@ SERVICE_STATE_FILE="$STATE_DIR/service_state.json"
 LAST_PROBE_FILE="$STATE_DIR/last_probe.json"
 RELEASE_LOCK_FILE="$STATE_DIR/release_lock.json"
 GATEWAY_PID_FILE="$STATE_DIR/gateway.pid"
+PROFILE_DIR="$CONFIG_DIR/profiles"
+ACTIVE_PROFILE_FILE="$STATE_DIR/active_profile"
+SECRET_META_FILE="$CONFIG_DIR/secret_metadata.json"
+SECRET_HISTORY_FILE="$STATE_DIR/secret_rotation_history.json"
+WATCHDOG_PID_FILE="$STATE_DIR/watchdog.pid"
+WATCHDOG_STATUS_FILE="$STATE_DIR/watchdog_status.json"
+WATCHDOG_LOG="$LOG_DIR/watchdog.log"
 VERSION_FILE="$ROOT_DIR/version"
 DEFAULT_GATEWAY_PORT="18789"
 DEFAULT_OPENCLAW_NPM_PACKAGE="openclaw"
@@ -692,10 +699,45 @@ npm_global_install_cmd() {
   esac
 }
 
+ensure_profile_migrated() {
+  if [[ -d "$PROFILE_DIR" ]]; then
+    return 0
+  fi
+
+  mkdir -p "$PROFILE_DIR/default/channels"
+
+  # Move existing config files into default profile
+  for f in env secrets.json policy.json secret_metadata.json; do
+    if [[ -f "$CONFIG_DIR/$f" && ! -L "$CONFIG_DIR/$f" ]]; then
+      mv "$CONFIG_DIR/$f" "$PROFILE_DIR/default/$f"
+    fi
+  done
+  if [[ -d "$CHANNEL_DIR" && ! -L "$CHANNEL_DIR" ]]; then
+    # Move channel contents, not the dir itself
+    if ls "$CHANNEL_DIR"/*.json >/dev/null 2>&1; then
+      mv "$CHANNEL_DIR"/*.json "$PROFILE_DIR/default/channels/" 2>/dev/null || true
+    fi
+    rmdir "$CHANNEL_DIR" 2>/dev/null || rm -rf "$CHANNEL_DIR"
+  fi
+
+  # Ensure default profile has required files
+  [[ -f "$PROFILE_DIR/default/env" ]] || cp "$ROOT_DIR/templates/env.example" "$PROFILE_DIR/default/env"
+  [[ -f "$PROFILE_DIR/default/secrets.json" ]] || cp "$ROOT_DIR/templates/secrets.example" "$PROFILE_DIR/default/secrets.json"
+  [[ -f "$PROFILE_DIR/default/policy.json" ]] || cp "$ROOT_DIR/templates/policy.json" "$PROFILE_DIR/default/policy.json"
+
+  # Create symlinks back to CONFIG_DIR
+  ln -sf "$PROFILE_DIR/default/env" "$CONFIG_DIR/env"
+  ln -sf "$PROFILE_DIR/default/secrets.json" "$CONFIG_DIR/secrets.json"
+  ln -sf "$PROFILE_DIR/default/policy.json" "$CONFIG_DIR/policy.json"
+  ln -sf "$PROFILE_DIR/default/channels" "$CONFIG_DIR/channels"
+
+  printf 'default\n' >"$ACTIVE_PROFILE_FILE"
+  info "migrated config to profile: default"
+}
+
 ensure_runtime_dirs() {
   mkdir -p \
     "$CONFIG_DIR" \
-    "$CHANNEL_DIR" \
     "$BACKUP_DIR" \
     "$LOG_DIR" \
     "$CACHE_DIR" \
@@ -705,6 +747,10 @@ ensure_runtime_dirs() {
     "$BUNDLE_REPORT_DIR" \
     "$STATE_DIR"
 
+  # Profile migration: move flat config into profiles/default/
+  ensure_profile_migrated
+
+  # Ensure symlinked files exist (for fresh installs after migration)
   if [[ ! -f "$ENV_FILE" ]]; then
     cp "$ROOT_DIR/templates/env.example" "$ENV_FILE"
   fi

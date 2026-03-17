@@ -254,6 +254,8 @@ tui_main_menu() {
       "backup"   "Backup management" \
       "update"   "Update OpenClaw" \
       "security" "Security audit" \
+      "profile"  "Manage profiles" \
+      "watchdog" "Watchdog monitoring" \
       "logs"     "View logs" \
       "uninstall" "Uninstall OpenClaw" \
       "quit"     "Exit")" || break
@@ -273,6 +275,8 @@ tui_main_menu() {
       backup)   tui_submenu_backup ;;
       update)   tui_cmd_update ;;
       security) tui_submenu_security ;;
+      profile)  tui_submenu_profile ;;
+      watchdog) tui_submenu_watchdog ;;
       logs)     tui_cmd_logs ;;
       uninstall) tui_cmd_uninstall ;;
       quit)     break ;;
@@ -430,7 +434,10 @@ tui_submenu_secret() {
       "list"     "List secrets (masked)" \
       "set-key"  "Set model API key" \
       "set"      "Set custom secret" \
+      "rotate"   "Rotate a secret" \
       "audit"    "Audit secrets" \
+      "history"  "Rotation history" \
+      "rotate-expired" "Rotate all expired" \
       "back"     "Back to main menu")" || break
 
     case "$choice" in
@@ -453,6 +460,23 @@ tui_submenu_secret() {
         fi
         ;;
       audit)   tui_run_and_show "Secret Audit" "$ROOT_DIR/bin/simple-openclaw" secret audit ;;
+      rotate)
+        local rkey
+        rkey="$(tui_inputbox "Rotate Secret" "Enter secret key to rotate:")" || continue
+        [[ -n "$rkey" ]] && {
+          clear
+          "$ROOT_DIR/bin/simple-openclaw" secret rotate "$rkey" || true
+          tui_msgbox "Rotate" "Secret rotation complete."
+        }
+        ;;
+      history) tui_run_and_show "Rotation History" "$ROOT_DIR/bin/simple-openclaw" secret history ;;
+      rotate-expired)
+        if tui_yesno "Rotate Expired" "Rotate all expired secrets?"; then
+          clear
+          "$ROOT_DIR/bin/simple-openclaw" secret rotate-expired || true
+          tui_msgbox "Rotate" "Expired secrets rotation complete."
+        fi
+        ;;
       back)    break ;;
     esac
   done
@@ -620,6 +644,101 @@ tui_submenu_backup() {
           fi
         fi
         ;;
+      back) break ;;
+    esac
+  done
+}
+
+tui_submenu_profile() {
+  while true; do
+    local choice
+    choice="$(tui_menu "Profile Management" \
+      "Select an action:" \
+      "list"    "List profiles" \
+      "create"  "Create a new profile" \
+      "switch"  "Switch active profile" \
+      "delete"  "Delete a profile" \
+      "export"  "Export a profile" \
+      "import"  "Import a profile" \
+      "back"    "Back to main menu")" || break
+
+    case "$choice" in
+      list)   tui_run_and_show "Profiles" "$ROOT_DIR/bin/simple-openclaw" profile list ;;
+      create)
+        local pname
+        pname="$(tui_inputbox "Create Profile" "Enter profile name:")" || continue
+        [[ -n "$pname" ]] && {
+          clear
+          "$ROOT_DIR/bin/simple-openclaw" profile create "$pname" || true
+          tui_msgbox "Profile" "Profile '$pname' created."
+        }
+        ;;
+      switch)
+        local pname
+        pname="$(tui_inputbox "Switch Profile" "Enter profile name:")" || continue
+        [[ -n "$pname" ]] && {
+          clear
+          "$ROOT_DIR/bin/simple-openclaw" profile switch "$pname" || true
+          tui_msgbox "Profile" "Switched to profile '$pname'."
+        }
+        ;;
+      delete)
+        local pname
+        pname="$(tui_inputbox "Delete Profile" "Enter profile name:")" || continue
+        [[ -n "$pname" ]] && {
+          if tui_yesno "Confirm Delete" "Delete profile '$pname'?\nThis cannot be undone."; then
+            clear
+            "$ROOT_DIR/bin/simple-openclaw" profile delete "$pname" || true
+          fi
+        }
+        ;;
+      export)
+        local pname
+        pname="$(tui_inputbox "Export Profile" "Enter profile name:")" || continue
+        [[ -n "$pname" ]] && {
+          clear
+          "$ROOT_DIR/bin/simple-openclaw" profile export "$pname" || true
+          tui_msgbox "Export" "Profile exported."
+        }
+        ;;
+      import)
+        local pfile
+        pfile="$(tui_inputbox "Import Profile" "Enter archive file path:")" || continue
+        [[ -n "$pfile" ]] && {
+          clear
+          "$ROOT_DIR/bin/simple-openclaw" profile import "$pfile" || true
+          tui_msgbox "Import" "Profile imported."
+        }
+        ;;
+      back) break ;;
+    esac
+  done
+}
+
+tui_submenu_watchdog() {
+  while true; do
+    local choice
+    choice="$(tui_menu "Watchdog Monitoring" \
+      "Select an action:" \
+      "status"  "Show watchdog status" \
+      "start"   "Start watchdog" \
+      "stop"    "Stop watchdog" \
+      "log"     "View watchdog log" \
+      "back"    "Back to main menu")" || break
+
+    case "$choice" in
+      status) tui_run_and_show "Watchdog Status" "$ROOT_DIR/bin/simple-openclaw" watchdog status ;;
+      start)
+        clear
+        "$ROOT_DIR/bin/simple-openclaw" watchdog start || true
+        tui_msgbox "Watchdog" "Watchdog started."
+        ;;
+      stop)
+        clear
+        "$ROOT_DIR/bin/simple-openclaw" watchdog stop || true
+        tui_msgbox "Watchdog" "Watchdog stopped."
+        ;;
+      log) tui_run_and_show "Watchdog Log" "$ROOT_DIR/bin/simple-openclaw" watchdog log ;;
       back) break ;;
     esac
   done

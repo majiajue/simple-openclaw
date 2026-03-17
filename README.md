@@ -201,13 +201,15 @@ The menu provides access to all operations:
 - Service management (start / stop / restart / status)
 - Chat (open terminal chat UI)
 - Model configuration
-- Secret management
+- Secret management (with rotation and audit)
 - Channel management
 - Plugin management (install, audit, security scan)
 - Health check (doctor)
 - Backup and restore
 - Update
 - Security audit and hardening
+- Profile management (multi-environment)
+- Watchdog monitoring
 - Log viewer
 - Uninstall
 
@@ -347,7 +349,10 @@ simple-openclaw model test
 # Secrets
 simple-openclaw secret set <key> <value>
 simple-openclaw secret list
+simple-openclaw secret rotate <key>
 simple-openclaw secret audit
+simple-openclaw secret history
+simple-openclaw secret rotate-expired
 
 # Channels
 simple-openclaw channel add <name>
@@ -383,7 +388,8 @@ simple-openclaw update --target <ver>
 
 # Other
 simple-openclaw repair <stale-process|port|service>
-simple-openclaw watchdog <enable|disable|status>
+simple-openclaw watchdog <start|stop|status|log>
+simple-openclaw profile <create|list|switch|delete|export|import|active>
 simple-openclaw logs [--follow|--since <window>]
 simple-openclaw support-bundle
 ```
@@ -414,13 +420,14 @@ packaging/   install and release helpers
 
 ```text
 ~/.simple-openclaw/
-  config/          env, secrets.json, policy.json, channels/
+  config/          env, secrets.json, policy.json, channels/ (symlinks to active profile)
+  config/profiles/ named profile directories (default, staging, prod, etc.)
   backups/
-  logs/
+  logs/            openclaw-gateway.log, watchdog.log
   cache/
   snapshots/
   reports/         doctor/, security/
-  state/           service_state.json, installed_plugins.db
+  state/           service_state.json, installed_plugins.db, watchdog.pid, active_profile
 ```
 
 ## Who This Is For
@@ -431,7 +438,7 @@ packaging/   install and release helpers
 
 ## Roadmap
 
-### v2.0 (current)
+### v2.0
 
 - install / init / uninstall
 - model / channel / plugin flows
@@ -444,11 +451,11 @@ packaging/   install and release helpers
 - interactive TUI menu and setup wizard
 - logs / support-bundle
 
-### v2.1
+### v2.1 (current)
 
-- watchdog
-- secret rotation
-- multi-profile environments
+- watchdog auto-restart with configurable interval, max retries, and cooldown
+- secret rotation with history tracking, age-based audit, and batch rotation
+- multi-profile environments (create, switch, export, import profiles)
 
 ### v2.2
 

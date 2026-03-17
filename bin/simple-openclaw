@@ -8,7 +8,7 @@ source "$ROOT_DIR/lib/common.sh"
 
 usage() {
   cat <<'EOF'
-simple-openclaw v2.0
+simple-openclaw v2.1
 
 Usage:
   simple-openclaw [command] [subcommand] [options]
@@ -38,10 +38,11 @@ Domains:
   rollback <snapshot-id>
   update [--check|--target <ver>]
   release <list|stable>
-  secret <set|list|rotate|audit>
+  secret <set|list|rotate|audit|history|rotate-expired>
   security [audit|harden]
   repair <stale-process|port|service>
-  watchdog <enable|disable|status>
+  watchdog <start|stop|status|log>
+  profile <create|list|switch|delete|export|import|active>
   logs [--follow|--since <window>]
   support-bundle
 
@@ -139,6 +140,9 @@ main() {
       ;;
     watchdog)
       dispatch_module watchdog "$@"
+      ;;
+    profile)
+      dispatch_module profile "$@"
       ;;
     logs)
       dispatch_module logs "$@"

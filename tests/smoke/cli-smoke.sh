@@ -107,6 +107,23 @@ chmod +x "$FAKE_BIN_DIR/node" "$FAKE_BIN_DIR/cmake" "$FAKE_BIN_DIR/g++" \
 "$ROOT_DIR/bin/simple-openclaw" backup create >/dev/null
 "$ROOT_DIR/bin/simple-openclaw" doctor >/dev/null
 
+# v2.1: Profile management
+"$ROOT_DIR/bin/simple-openclaw" profile list >/dev/null
+"$ROOT_DIR/bin/simple-openclaw" profile create staging >/dev/null
+"$ROOT_DIR/bin/simple-openclaw" profile list >/dev/null
+"$ROOT_DIR/bin/simple-openclaw" profile switch staging >/dev/null
+"$ROOT_DIR/bin/simple-openclaw" profile active >/dev/null
+"$ROOT_DIR/bin/simple-openclaw" profile switch default >/dev/null
+"$ROOT_DIR/bin/simple-openclaw" profile delete staging >/dev/null
+
+# v2.1: Secret rotation (audit and history, rotate needs interactive input)
+"$ROOT_DIR/bin/simple-openclaw" secret audit >/dev/null
+"$ROOT_DIR/bin/simple-openclaw" secret history >/dev/null
+
+# v2.1: Watchdog
+"$ROOT_DIR/bin/simple-openclaw" watchdog status >/dev/null
+"$ROOT_DIR/bin/simple-openclaw" watchdog log >/dev/null
+
 grep -q "npm install -g openclaw@latest --ignore-scripts" "$FAKE_LOG"
 grep -q "openclaw plugins install @openclaw/feishu --pin" "$FAKE_LOG"
 grep -q "openclaw update --channel stable" "$FAKE_LOG"
